@@ -18,12 +18,12 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      padding: 20px;
+      padding: 15px;
       color: #fff;
     }
 
     .phone {
-      width: 380px;
+      width: 400px;
       height: 780px;
       background: #111;
       border-radius: 40px;
@@ -90,16 +90,11 @@
       font-size: 14px;
       outline: none;
       margin-bottom: 20px;
-      transition: 0.2s;
     }
 
     .link-input:focus {
       border-color: #3a7bd5;
       background: rgba(58,123,213,0.15);
-    }
-
-    .link-input::placeholder {
-      color: #666;
     }
 
     .start-btn {
@@ -111,18 +106,13 @@
       font-size: 16px;
       font-weight: 600;
       cursor: pointer;
-      transition: 0.2s;
-    }
-
-    .start-btn:active {
-      transform: scale(0.97);
     }
 
     /* Video Screen */
     #video-screen {
       display: none;
       height: 100%;
-      padding: 38px 6px 6px;
+      padding: 42px 8px 8px;
       flex-direction: column;
     }
 
@@ -130,19 +120,24 @@
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       grid-template-rows: repeat(4, 1fr);
-      gap: 5px;
+      gap: 6px;
       height: 100%;
     }
 
     .video-box {
       position: relative;
       background: #000;
-      border-radius: 10px;
+      border-radius: 8px;
       overflow: hidden;
-      border: 1px solid rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.1);
+      /* 16:9 অনুপাত ধরে রাখার চেষ্টা */
+      aspect-ratio: 16 / 9;
     }
 
     .video-box iframe {
+      position: absolute;
+      top: 0;
+      left: 0;
       width: 100%;
       height: 100%;
       border: none;
@@ -150,13 +145,13 @@
 
     .sound-btn {
       position: absolute;
-      bottom: 4px;
-      right: 4px;
+      bottom: 5px;
+      right: 5px;
       width: 26px;
       height: 26px;
       border-radius: 50%;
       background: rgba(0,0,0,0.75);
-      border: 1px solid rgba(255,255,255,0.2);
+      border: 1px solid rgba(255,255,255,0.25);
       color: #fff;
       font-size: 13px;
       display: flex;
@@ -172,7 +167,7 @@
 
     .back-btn {
       position: absolute;
-      top: 8px;
+      top: 10px;
       left: 12px;
       background: rgba(255,255,255,0.12);
       border: none;
@@ -191,7 +186,7 @@
     <div class="phone-notch"></div>
 
     <div class="screen">
-      <!-- Setup Screen -->
+      <!-- Setup -->
       <div id="setup-screen">
         <div class="title">12 Screen Player</div>
         <div class="subtitle">একটা YouTube লিংক দিন</div>
@@ -201,7 +196,7 @@
         <button class="start-btn" onclick="startVideos()">Start 12 Screens</button>
       </div>
 
-      <!-- Video Screen -->
+      <!-- Videos -->
       <div id="video-screen">
         <button class="back-btn" onclick="goBack()">← Back</button>
         <div class="video-grid" id="video-grid"></div>
@@ -228,14 +223,16 @@
       const videoGrid = document.getElementById('video-grid');
       videoGrid.innerHTML = '';
 
-      for (let i = 1; i <= 12; i++) {
+      for (let i = 0; i < 12; i++) {
         const box = document.createElement('div');
         box.className = 'video-box';
 
+        // অফিসিয়াল YouTube Embed ফরম্যাট
         const iframe = document.createElement('iframe');
-        iframe.src = `https://www.youtube.com/embed/\( {videoId}?autoplay=1&mute=1&controls=0&modestbranding=1&rel=0&loop=1&playlist= \){videoId}`;
-        iframe.allow = "autoplay; encrypted-media";
+        iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&controls=0&modestbranding=1&rel=0&playsinline=1&enablejsapi=1`;
+        iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
         iframe.allowFullscreen = true;
+        iframe.loading = "lazy";
         box.appendChild(iframe);
 
         // সাউন্ড বাটন
@@ -256,11 +253,13 @@
 
     function toggleSound(btn, iframe, videoId) {
       if (btn.classList.contains('unmuted')) {
-        iframe.src = `https://www.youtube.com/embed/\( {videoId}?autoplay=1&mute=1&controls=0&modestbranding=1&rel=0&loop=1&playlist= \){videoId}`;
+        // Mute
+        iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&controls=0&modestbranding=1&rel=0&playsinline=1`;
         btn.innerHTML = '🔇';
         btn.classList.remove('unmuted');
       } else {
-        iframe.src = `https://www.youtube.com/embed/\( {videoId}?autoplay=1&mute=0&controls=0&modestbranding=1&rel=0&loop=1&playlist= \){videoId}`;
+        // Unmute
+        iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&controls=0&modestbranding=1&rel=0&playsinline=1`;
         btn.innerHTML = '🔊';
         btn.classList.add('unmuted');
       }
