@@ -18,7 +18,7 @@ const auth = getAuth(app);
 const db = getDatabase(app);
 
 const ALLOWED_EMAIL = "tarekmahmud821@gmail.com";
-const ALLOWED_UID = "CsPWgC7ZwygIcYW9YS4M65g5VyF3";
+const ALLOWED_UID = "FahnXuZGlmhxn3zfgbroZDBlj7D2";
 
 // ==================== AUTH ====================
 window.adminLogin = async function () {
