@@ -76,21 +76,7 @@ window.adminLogin = async function () {
 
   } catch (error) {
     console.error("Login Error:", error);
-    
-    let message = "লগইন ব্যর্থ!";
-    if (error.code === "auth/user-not-found") {
-      message = "এই ইমেইল দিয়ে কোনো অ্যাকাউন্ট নেই";
-    } else if (error.code === "auth/wrong-password" || error.code === "auth/invalid-credential") {
-      message = "পাসওয়ার্ড ভুল!";
-    } else if (error.code === "auth/invalid-email") {
-      message = "ইমেইল ফরম্যাট ভুল!";
-    } else if (error.code === "auth/too-many-requests") {
-      message = "অনেকবার চেষ্টা করেছেন। একটু পর আবার চেষ্টা করুন।";
-    } else {
-      message = error.message;
-    }
-
-    errorEl.innerText = message;
+    errorEl.innerText = error.message;
     statusEl.innerText = "";
     loginBtn.disabled = false;
     loginBtn.innerText = "Login";
@@ -222,10 +208,9 @@ function loadUsers() {
       list.innerHTML += `
         <div class="card">
           <h3>${data.name || "No Name"}</h3>
-          <p>Email: ${data.email || "-"}</p>
           <p>Phone: ${data.phone || "-"}</p>
           <p>Status: <b>${sub.status || "None"}</b></p>
-          <p>Expiry: ${sub.expiry ? new Date(sub.expiry).toLocaleDateString() : "-"}</p>
+          <p>Expiry: ${sub.expiry ? new Date(sub.expiry).toLocaleString() : "-"}</p>
           <div class="actions">
             <button class="btn-edit" onclick="editUser('${id}')">Edit Subscription</button>
           </div>
@@ -239,7 +224,7 @@ window.editUser = async function (uid) {
   const days = prompt("কত দিন সাবস্ক্রিপশন দিবেন? (0 দিলে ক্যান্সেল)");
   if (days === null) return;
 
-  const expiry = Number(days) > 0 ? Date.now() + (Number(days) * 24 * 60 * 60 * 1000) : null;
+  const expiry = Number(days) > 0 ? Date.now() + (Number(days) * 24 * 60 * 60 * 1000) : 0;
 
   await updateDoc(doc(db, "users", uid), {
     subscription: {
@@ -271,7 +256,7 @@ function loadPayments() {
       list.innerHTML += `
         <div class="card">
           <h3>Payment Request</h3>
-          <p>User: ${data.userEmail || data.userId}</p>
+          <p>User Email/ID: ${data.userEmail || data.userId}</p>
           <p>Package: ${data.packageName || "-"}</p>
           <p>Amount: ৳${data.amount}</p>
           <p>TrxID: ${data.transactionId}</p>
@@ -287,31 +272,44 @@ function loadPayments() {
   });
 }
 
+// Fixed APPROVE PAYMENT Logic
 window.approvePayment = async function (paymentId, userId, days) {
-  const expiry = Date.now() + (Number(days) * 24 * 60 * 60 * 1000);
+  try {
+    const duration = Number(days) || 30;
+    const expiry = Date.now() + (duration * 24 * 60 * 60 * 1000);
 
-  await updateDoc(doc(db, "payments", paymentId), { 
-    status: "approved",
-    approvedAt: Date.now()
-  });
+    // 1. Update Payment Record Status
+    await updateDoc(doc(db, "payments", paymentId), { 
+      status: "approved",
+      approvedAt: Date.now()
+    });
 
-  await updateDoc(doc(doc(db, "users", userId)), {
-    subscription: {
-      status: "active",
-      expiry: expiry,
-      updatedAt: Date.now()
-    }
-  });
+    // 2. Update User's Active Subscription (Shorter & Accurate Reference)
+    await updateDoc(doc(db, "users", userId), {
+      subscription: {
+        status: "active",
+        expiry: expiry,
+        updatedAt: Date.now()
+      }
+    });
 
-  alert("Payment Approved!");
+    alert("পেমেন্ট সফলভাবে Approved করা হয়েছে! ইউজার এখন অ্যাপ দেখতে পারবে।");
+  } catch (error) {
+    console.error("Approve Error:", error);
+    alert("অ্যাপ্রুভ করতে সমস্যা হয়েছে: " + error.message);
+  }
 };
 
 window.rejectPayment = async function (paymentId) {
-  await updateDoc(doc(db, "payments", paymentId), { 
-    status: "rejected",
-    rejectedAt: Date.now()
-  });
-  alert("Payment Rejected");
+  try {
+    await updateDoc(doc(db, "payments", paymentId), { 
+      status: "rejected",
+      rejectedAt: Date.now()
+    });
+    alert("Payment Rejected");
+  } catch (error) {
+    alert("এরর: " + error.message);
+  }
 };
 
 // ==================== CHANNELS ====================
