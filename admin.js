@@ -29,7 +29,6 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 const ALLOWED_EMAIL = "tarekmahmud821@gmail.com";
-const ALLOWED_UID = "FahnXuZGlmhxn3zfgbroZDBlj7D2";
 
 // ==================== LOGIN ====================
 window.adminLogin = async function () {
@@ -52,7 +51,7 @@ window.adminLogin = async function () {
     return;
   }
 
-  if (email !== ALLOWED_EMAIL) {
+  if (email.toLowerCase() !== ALLOWED_EMAIL.toLowerCase()) {
     errorEl.innerText = "এই ইমেইল দিয়ে অ্যাডমিন লগইন করা যাবে না!";
     statusEl.innerText = "";
     loginBtn.disabled = false;
@@ -64,18 +63,15 @@ window.adminLogin = async function () {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
 
-    console.log("Logged in UID:", user.uid);
-
-    if (user.uid !== ALLOWED_UID) {
+    if (user.email.toLowerCase() !== ALLOWED_EMAIL.toLowerCase()) {
       await signOut(auth);
-      errorEl.innerText = "আপনি অনুমোদিত অ্যাডমিন নন!";
+      errorEl.innerText = "অনুমোদিত অ্যাডমিন নন!";
       statusEl.innerText = "";
       loginBtn.disabled = false;
       loginBtn.innerText = "Login";
       return;
     }
 
-    // সফল হলে onAuthStateChanged হ্যান্ডেল করবে
     statusEl.innerText = "লগইন সফল! ড্যাশবোর্ড লোড হচ্ছে...";
 
   } catch (error) {
@@ -83,8 +79,8 @@ window.adminLogin = async function () {
     
     let message = "লগইন ব্যর্থ!";
     if (error.code === "auth/user-not-found") {
-      message = "এই ইমেইল দিয়ে কোনো অ্যাকাউন্ট নেই। Firebase Authentication-এ ইউজার তৈরি করুন।";
-    } else if (error.code === "auth/wrong-password") {
+      message = "এই ইমেইল দিয়ে কোনো অ্যাকাউন্ট নেই";
+    } else if (error.code === "auth/wrong-password" || error.code === "auth/invalid-credential") {
       message = "পাসওয়ার্ড ভুল!";
     } else if (error.code === "auth/invalid-email") {
       message = "ইমেইল ফরম্যাট ভুল!";
@@ -107,12 +103,11 @@ window.logout = function () {
 
 // Auth State Change
 onAuthStateChanged(auth, (user) => {
-  if (user && user.email === ALLOWED_EMAIL && user.uid === ALLOWED_UID) {
+  if (user && user.email && user.email.toLowerCase() === ALLOWED_EMAIL.toLowerCase()) {
     document.getElementById("loginPage").style.display = "none";
     document.getElementById("dashboard").style.display = "block";
     document.getElementById("adminName").innerText = user.email;
 
-    // Load all data
     loadPackages();
     loadUsers();
     loadPayments();
@@ -127,9 +122,10 @@ onAuthStateChanged(auth, (user) => {
 window.showSection = function (section) {
   document.querySelectorAll(".section").forEach(s => s.style.display = "none");
   document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
-
   document.getElementById(section + "Section").style.display = "block";
-  event.target.classList.add("active");
+  if (event && event.target) {
+    event.target.classList.add("active");
+  }
 };
 
 // ==================== PACKAGES ====================
@@ -179,7 +175,7 @@ function loadPackages() {
           <p>Price: ৳${data.price}</p>
           <p>Duration: ${data.durationDays} Days</p>
           <div class="actions">
-            <button class="btn-edit" onclick="editPackage('\( {id}', ' \){data.name}', ${data.price}, ${data.durationDays})">Edit</button>
+            <button class="btn-edit" onclick="editPackage('${id}', '${data.name}', ${data.price}, ${data.durationDays})">Edit</button>
             <button class="btn-delete" onclick="deletePackage('${id}')">Delete</button>
           </div>
         </div>
@@ -282,7 +278,7 @@ function loadPayments() {
           <p>Time: ${data.timestamp ? new Date(data.timestamp).toLocaleString() : "-"}</p>
           <span class="badge pending">Pending</span>
           <div class="actions">
-            <button class="btn-approve" onclick="approvePayment('\( {id}', ' \){data.userId}', ${data.durationDays || 30})">Approve</button>
+            <button class="btn-approve" onclick="approvePayment('${id}', '${data.userId}', ${data.durationDays || 30})">Approve</button>
             <button class="btn-reject" onclick="rejectPayment('${id}')">Reject</button>
           </div>
         </div>
@@ -299,7 +295,7 @@ window.approvePayment = async function (paymentId, userId, days) {
     approvedAt: Date.now()
   });
 
-  await updateDoc(doc(db, "users", userId), {
+  await updateDoc(doc(doc(db, "users", userId)), {
     subscription: {
       status: "active",
       expiry: expiry,
@@ -366,7 +362,7 @@ function loadChannels() {
           <h3>${data.name}</h3>
           <p>Category: ${data.category}</p>
           <p style="font-size:11px;word-break:break-all;">${data.url}</p>
-          \( {data.logo ? `<img src=" \){data.logo}" style="width:60px;height:40px;object-fit:contain;margin-top:8px;" onerror="this.style.display='none'">` : ""}
+          ${data.logo ? `<img src="${data.logo}" style="width:60px;height:40px;object-fit:contain;margin-top:8px;" onerror="this.style.display='none'">` : ""}
           <div class="actions">
             <button class="btn-delete" onclick="deleteChannel('${id}')">Delete</button>
           </div>
