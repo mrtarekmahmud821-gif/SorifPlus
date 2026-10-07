@@ -1,10 +1,9 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
 import { 
   getFirestore, 
   collection, 
   doc, 
-  setDoc, 
   addDoc, 
   updateDoc, 
   deleteDoc, 
@@ -12,8 +11,9 @@ import {
   query, 
   where,
   serverTimestamp 
-} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+} from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
+// Firebase Config
 const firebaseConfig = {
   apiKey: "AIzaSyDzaSJuMumdlp_ZzjKvatvGm_7XLxq3jFM",
   authDomain: "link-click-work.firebaseapp.com",
@@ -31,25 +31,73 @@ const db = getFirestore(app);
 const ALLOWED_EMAIL = "tarekmahmud821@gmail.com";
 const ALLOWED_UID = "FahnXuZGlmhxn3zfgbroZDBlj7D2";
 
-// ==================== AUTH ====================
+// ==================== LOGIN ====================
 window.adminLogin = async function () {
   const email = document.getElementById("adminEmail").value.trim();
   const password = document.getElementById("adminPassword").value;
+  const errorEl = document.getElementById("loginError");
+  const statusEl = document.getElementById("loginStatus");
+  const loginBtn = document.getElementById("loginBtn");
+
+  errorEl.innerText = "";
+  statusEl.innerText = "লগইন হচ্ছে...";
+  loginBtn.disabled = true;
+  loginBtn.innerText = "Please wait...";
+
+  if (!email || !password) {
+    errorEl.innerText = "ইমেইল এবং পাসওয়ার্ড দিন";
+    statusEl.innerText = "";
+    loginBtn.disabled = false;
+    loginBtn.innerText = "Login";
+    return;
+  }
 
   if (email !== ALLOWED_EMAIL) {
-    document.getElementById("loginError").innerText = "এই ইমেইল দিয়ে লগইন করা যাবে না!";
+    errorEl.innerText = "এই ইমেইল দিয়ে অ্যাডমিন লগইন করা যাবে না!";
+    statusEl.innerText = "";
+    loginBtn.disabled = false;
+    loginBtn.innerText = "Login";
     return;
   }
 
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    if (userCredential.user.uid !== ALLOWED_UID) {
+    const user = userCredential.user;
+
+    console.log("Logged in UID:", user.uid);
+
+    if (user.uid !== ALLOWED_UID) {
       await signOut(auth);
-      document.getElementById("loginError").innerText = "অনুমোদিত অ্যাডমিন নন!";
+      errorEl.innerText = "আপনি অনুমোদিত অ্যাডমিন নন!";
+      statusEl.innerText = "";
+      loginBtn.disabled = false;
+      loginBtn.innerText = "Login";
       return;
     }
+
+    // সফল হলে onAuthStateChanged হ্যান্ডেল করবে
+    statusEl.innerText = "লগইন সফল! ড্যাশবোর্ড লোড হচ্ছে...";
+
   } catch (error) {
-    document.getElementById("loginError").innerText = "লগইন ব্যর্থ: " + error.message;
+    console.error("Login Error:", error);
+    
+    let message = "লগইন ব্যর্থ!";
+    if (error.code === "auth/user-not-found") {
+      message = "এই ইমেইল দিয়ে কোনো অ্যাকাউন্ট নেই। Firebase Authentication-এ ইউজার তৈরি করুন।";
+    } else if (error.code === "auth/wrong-password") {
+      message = "পাসওয়ার্ড ভুল!";
+    } else if (error.code === "auth/invalid-email") {
+      message = "ইমেইল ফরম্যাট ভুল!";
+    } else if (error.code === "auth/too-many-requests") {
+      message = "অনেকবার চেষ্টা করেছেন। একটু পর আবার চেষ্টা করুন।";
+    } else {
+      message = error.message;
+    }
+
+    errorEl.innerText = message;
+    statusEl.innerText = "";
+    loginBtn.disabled = false;
+    loginBtn.innerText = "Login";
   }
 };
 
@@ -57,11 +105,14 @@ window.logout = function () {
   signOut(auth);
 };
 
+// Auth State Change
 onAuthStateChanged(auth, (user) => {
   if (user && user.email === ALLOWED_EMAIL && user.uid === ALLOWED_UID) {
     document.getElementById("loginPage").style.display = "none";
     document.getElementById("dashboard").style.display = "block";
     document.getElementById("adminName").innerText = user.email;
+
+    // Load all data
     loadPackages();
     loadUsers();
     loadPayments();
@@ -76,6 +127,7 @@ onAuthStateChanged(auth, (user) => {
 window.showSection = function (section) {
   document.querySelectorAll(".section").forEach(s => s.style.display = "none");
   document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+
   document.getElementById(section + "Section").style.display = "block";
   event.target.classList.add("active");
 };
@@ -99,7 +151,7 @@ window.addPackage = async function () {
       active: true,
       createdAt: serverTimestamp()
     });
-    alert("Package যোগ হয়েছে!");
+    alert("Package সফলভাবে যোগ হয়েছে!");
     document.getElementById("pkgName").value = "";
     document.getElementById("pkgPrice").value = "";
     document.getElementById("pkgDays").value = "";
@@ -112,6 +164,12 @@ function loadPackages() {
   onSnapshot(collection(db, "packages"), (snapshot) => {
     const list = document.getElementById("packagesList");
     list.innerHTML = "";
+    
+    if (snapshot.empty) {
+      list.innerHTML = "<p style='color:#888'>কোনো Package নেই</p>";
+      return;
+    }
+
     snapshot.forEach((docSnap) => {
       const data = docSnap.data();
       const id = docSnap.id;
@@ -155,6 +213,12 @@ function loadUsers() {
   onSnapshot(collection(db, "users"), (snapshot) => {
     const list = document.getElementById("usersList");
     list.innerHTML = "";
+
+    if (snapshot.empty) {
+      list.innerHTML = "<p style='color:#888'>কোনো User নেই</p>";
+      return;
+    }
+
     snapshot.forEach((docSnap) => {
       const data = docSnap.data();
       const id = docSnap.id;
@@ -164,7 +228,7 @@ function loadUsers() {
           <h3>${data.name || "No Name"}</h3>
           <p>Email: ${data.email || "-"}</p>
           <p>Phone: ${data.phone || "-"}</p>
-          <p>Status: ${sub.status || "None"}</p>
+          <p>Status: <b>${sub.status || "None"}</b></p>
           <p>Expiry: ${sub.expiry ? new Date(sub.expiry).toLocaleDateString() : "-"}</p>
           <div class="actions">
             <button class="btn-edit" onclick="editUser('${id}')">Edit Subscription</button>
@@ -179,11 +243,11 @@ window.editUser = async function (uid) {
   const days = prompt("কত দিন সাবস্ক্রিপশন দিবেন? (0 দিলে ক্যান্সেল)");
   if (days === null) return;
 
-  const expiry = days > 0 ? Date.now() + (days * 24 * 60 * 60 * 1000) : null;
+  const expiry = Number(days) > 0 ? Date.now() + (Number(days) * 24 * 60 * 60 * 1000) : null;
 
   await updateDoc(doc(db, "users", uid), {
     subscription: {
-      status: days > 0 ? "active" : "expired",
+      status: Number(days) > 0 ? "active" : "expired",
       expiry: expiry,
       updatedAt: Date.now()
     }
@@ -194,10 +258,16 @@ window.editUser = async function (uid) {
 // ==================== PAYMENTS ====================
 function loadPayments() {
   const q = query(collection(db, "payments"), where("status", "==", "pending"));
-  
+
   onSnapshot(q, (snapshot) => {
     const list = document.getElementById("paymentsList");
     list.innerHTML = "";
+
+    if (snapshot.empty) {
+      list.innerHTML = "<p style='color:#888'>কোনো Pending Payment নেই</p>";
+      return;
+    }
+
     snapshot.forEach((docSnap) => {
       const data = docSnap.data();
       const id = docSnap.id;
@@ -206,13 +276,13 @@ function loadPayments() {
         <div class="card">
           <h3>Payment Request</h3>
           <p>User: ${data.userEmail || data.userId}</p>
-          <p>Package: ${data.packageName}</p>
+          <p>Package: ${data.packageName || "-"}</p>
           <p>Amount: ৳${data.amount}</p>
           <p>TrxID: ${data.transactionId}</p>
           <p>Time: ${data.timestamp ? new Date(data.timestamp).toLocaleString() : "-"}</p>
           <span class="badge pending">Pending</span>
           <div class="actions">
-            <button class="btn-approve" onclick="approvePayment('\( {id}', ' \){data.userId}', ${data.durationDays})">Approve</button>
+            <button class="btn-approve" onclick="approvePayment('\( {id}', ' \){data.userId}', ${data.durationDays || 30})">Approve</button>
             <button class="btn-reject" onclick="rejectPayment('${id}')">Reject</button>
           </div>
         </div>
@@ -222,7 +292,7 @@ function loadPayments() {
 }
 
 window.approvePayment = async function (paymentId, userId, days) {
-  const expiry = Date.now() + (days * 24 * 60 * 60 * 1000);
+  const expiry = Date.now() + (Number(days) * 24 * 60 * 60 * 1000);
 
   await updateDoc(doc(db, "payments", paymentId), { 
     status: "approved",
@@ -282,6 +352,12 @@ function loadChannels() {
   onSnapshot(collection(db, "channels"), (snapshot) => {
     const list = document.getElementById("channelsList");
     list.innerHTML = "";
+
+    if (snapshot.empty) {
+      list.innerHTML = "<p style='color:#888'>কোনো Channel নেই</p>";
+      return;
+    }
+
     snapshot.forEach((docSnap) => {
       const data = docSnap.data();
       const id = docSnap.id;
@@ -290,7 +366,7 @@ function loadChannels() {
           <h3>${data.name}</h3>
           <p>Category: ${data.category}</p>
           <p style="font-size:11px;word-break:break-all;">${data.url}</p>
-          \( {data.logo ? `<img src=" \){data.logo}" style="width:60px;height:40px;object-fit:contain;margin-top:8px;">` : ""}
+          \( {data.logo ? `<img src=" \){data.logo}" style="width:60px;height:40px;object-fit:contain;margin-top:8px;" onerror="this.style.display='none'">` : ""}
           <div class="actions">
             <button class="btn-delete" onclick="deleteChannel('${id}')">Delete</button>
           </div>
