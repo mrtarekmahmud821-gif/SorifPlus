@@ -1,11 +1,22 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
-import { getDatabase, ref, set, push, onValue, update, remove } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
+import { 
+  getFirestore, 
+  collection, 
+  doc, 
+  setDoc, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  onSnapshot, 
+  query, 
+  where,
+  serverTimestamp 
+} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzaSJuMumdlp_ZzjKvatvGm_7XLxq3jFM",
   authDomain: "link-click-work.firebaseapp.com",
-  databaseURL: "https://link-click-work-default-rtdb.firebaseio.com",
   projectId: "link-click-work",
   storageBucket: "link-click-work.firebasestorage.app",
   messagingSenderId: "1098565051426",
@@ -15,7 +26,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getDatabase(app);
+const db = getFirestore(app);
 
 const ALLOWED_EMAIL = "tarekmahmud821@gmail.com";
 const ALLOWED_UID = "FahnXuZGlmhxn3zfgbroZDBlj7D2";
@@ -37,7 +48,6 @@ window.adminLogin = async function () {
       document.getElementById("loginError").innerText = "অনুমোদিত অ্যাডমিন নন!";
       return;
     }
-    // success → onAuthStateChanged will handle
   } catch (error) {
     document.getElementById("loginError").innerText = "লগইন ব্যর্থ: " + error.message;
   }
@@ -66,13 +76,12 @@ onAuthStateChanged(auth, (user) => {
 window.showSection = function (section) {
   document.querySelectorAll(".section").forEach(s => s.style.display = "none");
   document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
-
   document.getElementById(section + "Section").style.display = "block";
   event.target.classList.add("active");
 };
 
 // ==================== PACKAGES ====================
-window.addPackage = function () {
+window.addPackage = async function () {
   const name = document.getElementById("pkgName").value.trim();
   const price = Number(document.getElementById("pkgPrice").value);
   const days = Number(document.getElementById("pkgDays").value);
@@ -82,28 +91,30 @@ window.addPackage = function () {
     return;
   }
 
-  const newRef = push(ref(db, "packages"));
-  set(newRef, {
-    name,
-    price,
-    durationDays: days,
-    active: true,
-    createdAt: Date.now()
-  }).then(() => {
+  try {
+    await addDoc(collection(db, "packages"), {
+      name,
+      price,
+      durationDays: days,
+      active: true,
+      createdAt: serverTimestamp()
+    });
     alert("Package যোগ হয়েছে!");
     document.getElementById("pkgName").value = "";
     document.getElementById("pkgPrice").value = "";
     document.getElementById("pkgDays").value = "";
-  });
+  } catch (error) {
+    alert("Error: " + error.message);
+  }
 };
 
 function loadPackages() {
-  onValue(ref(db, "packages"), (snapshot) => {
+  onSnapshot(collection(db, "packages"), (snapshot) => {
     const list = document.getElementById("packagesList");
     list.innerHTML = "";
-    snapshot.forEach((child) => {
-      const data = child.val();
-      const id = child.key;
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      const id = docSnap.id;
       list.innerHTML += `
         <div class="card">
           <h3>${data.name}</h3>
@@ -119,13 +130,13 @@ function loadPackages() {
   });
 }
 
-window.editPackage = function (id, name, price, days) {
+window.editPackage = async function (id, name, price, days) {
   const newName = prompt("Package Name:", name);
   const newPrice = prompt("Price:", price);
   const newDays = prompt("Duration (Days):", days);
 
   if (newName && newPrice && newDays) {
-    update(ref(db, "packages/" + id), {
+    await updateDoc(doc(db, "packages", id), {
       name: newName,
       price: Number(newPrice),
       durationDays: Number(newDays)
@@ -133,20 +144,20 @@ window.editPackage = function (id, name, price, days) {
   }
 };
 
-window.deletePackage = function (id) {
+window.deletePackage = async function (id) {
   if (confirm("ডিলিট করতে চান?")) {
-    remove(ref(db, "packages/" + id));
+    await deleteDoc(doc(db, "packages", id));
   }
 };
 
 // ==================== USERS ====================
 function loadUsers() {
-  onValue(ref(db, "users"), (snapshot) => {
+  onSnapshot(collection(db, "users"), (snapshot) => {
     const list = document.getElementById("usersList");
     list.innerHTML = "";
-    snapshot.forEach((child) => {
-      const data = child.val();
-      const id = child.key;
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      const id = docSnap.id;
       const sub = data.subscription || {};
       list.innerHTML += `
         <div class="card">
@@ -156,7 +167,7 @@ function loadUsers() {
           <p>Status: ${sub.status || "None"}</p>
           <p>Expiry: ${sub.expiry ? new Date(sub.expiry).toLocaleDateString() : "-"}</p>
           <div class="actions">
-            <button class="btn-edit" onclick="editUser('${id}')">Edit</button>
+            <button class="btn-edit" onclick="editUser('${id}')">Edit Subscription</button>
           </div>
         </div>
       `;
@@ -164,28 +175,32 @@ function loadUsers() {
   });
 }
 
-window.editUser = function (uid) {
+window.editUser = async function (uid) {
   const days = prompt("কত দিন সাবস্ক্রিপশন দিবেন? (0 দিলে ক্যান্সেল)");
   if (days === null) return;
 
   const expiry = days > 0 ? Date.now() + (days * 24 * 60 * 60 * 1000) : null;
 
-  update(ref(db, "users/" + uid + "/subscription"), {
-    status: days > 0 ? "active" : "expired",
-    expiry: expiry,
-    updatedAt: Date.now()
-  }).then(() => alert("User আপডেট হয়েছে"));
+  await updateDoc(doc(db, "users", uid), {
+    subscription: {
+      status: days > 0 ? "active" : "expired",
+      expiry: expiry,
+      updatedAt: Date.now()
+    }
+  });
+  alert("User আপডেট হয়েছে");
 };
 
 // ==================== PAYMENTS ====================
 function loadPayments() {
-  onValue(ref(db, "payments"), (snapshot) => {
+  const q = query(collection(db, "payments"), where("status", "==", "pending"));
+  
+  onSnapshot(q, (snapshot) => {
     const list = document.getElementById("paymentsList");
     list.innerHTML = "";
-    snapshot.forEach((child) => {
-      const data = child.val();
-      const id = child.key;
-      if (data.status !== "pending") return; // শুধু pending দেখাবে
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      const id = docSnap.id;
 
       list.innerHTML += `
         <div class="card">
@@ -194,7 +209,7 @@ function loadPayments() {
           <p>Package: ${data.packageName}</p>
           <p>Amount: ৳${data.amount}</p>
           <p>TrxID: ${data.transactionId}</p>
-          <p>Time: ${new Date(data.timestamp).toLocaleString()}</p>
+          <p>Time: ${data.timestamp ? new Date(data.timestamp).toLocaleString() : "-"}</p>
           <span class="badge pending">Pending</span>
           <div class="actions">
             <button class="btn-approve" onclick="approvePayment('\( {id}', ' \){data.userId}', ${data.durationDays})">Approve</button>
@@ -206,24 +221,35 @@ function loadPayments() {
   });
 }
 
-window.approvePayment = function (paymentId, userId, days) {
+window.approvePayment = async function (paymentId, userId, days) {
   const expiry = Date.now() + (days * 24 * 60 * 60 * 1000);
 
-  update(ref(db, "payments/" + paymentId), { status: "approved" });
-  update(ref(db, "users/" + userId + "/subscription"), {
-    status: "active",
-    expiry: expiry,
-    updatedAt: Date.now()
-  }).then(() => alert("Payment Approved!"));
+  await updateDoc(doc(db, "payments", paymentId), { 
+    status: "approved",
+    approvedAt: Date.now()
+  });
+
+  await updateDoc(doc(db, "users", userId), {
+    subscription: {
+      status: "active",
+      expiry: expiry,
+      updatedAt: Date.now()
+    }
+  });
+
+  alert("Payment Approved!");
 };
 
-window.rejectPayment = function (paymentId) {
-  update(ref(db, "payments/" + paymentId), { status: "rejected" })
-    .then(() => alert("Payment Rejected"));
+window.rejectPayment = async function (paymentId) {
+  await updateDoc(doc(db, "payments", paymentId), { 
+    status: "rejected",
+    rejectedAt: Date.now()
+  });
+  alert("Payment Rejected");
 };
 
 // ==================== CHANNELS ====================
-window.addChannel = function () {
+window.addChannel = async function () {
   const name = document.getElementById("chName").value.trim();
   const logo = document.getElementById("chLogo").value.trim();
   const url = document.getElementById("chUrl").value.trim();
@@ -234,29 +260,31 @@ window.addChannel = function () {
     return;
   }
 
-  const newRef = push(ref(db, "channels"));
-  set(newRef, {
-    name,
-    logo: logo || "",
-    url,
-    category,
-    active: true,
-    createdAt: Date.now()
-  }).then(() => {
+  try {
+    await addDoc(collection(db, "channels"), {
+      name,
+      logo: logo || "",
+      url,
+      category,
+      active: true,
+      createdAt: serverTimestamp()
+    });
     alert("Channel যোগ হয়েছে!");
     document.getElementById("chName").value = "";
     document.getElementById("chLogo").value = "";
     document.getElementById("chUrl").value = "";
-  });
+  } catch (error) {
+    alert("Error: " + error.message);
+  }
 };
 
 function loadChannels() {
-  onValue(ref(db, "channels"), (snapshot) => {
+  onSnapshot(collection(db, "channels"), (snapshot) => {
     const list = document.getElementById("channelsList");
     list.innerHTML = "";
-    snapshot.forEach((child) => {
-      const data = child.val();
-      const id = child.key;
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      const id = docSnap.id;
       list.innerHTML += `
         <div class="card">
           <h3>${data.name}</h3>
@@ -272,8 +300,8 @@ function loadChannels() {
   });
 }
 
-window.deleteChannel = function (id) {
+window.deleteChannel = async function (id) {
   if (confirm("Channel ডিলিট করতে চান?")) {
-    remove(ref(db, "channels/" + id));
+    await deleteDoc(doc(db, "channels", id));
   }
 };
