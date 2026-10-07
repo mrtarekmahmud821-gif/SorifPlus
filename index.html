@@ -1,274 +1,103 @@
 <!DOCTYPE html>
 <html lang="bn">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>12 Screen YouTube Player</title>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      font-family: 'Segoe UI', system-ui, sans-serif;
-    }
-
-    body {
-      background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
-      min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      padding: 15px;
-      color: #fff;
-    }
-
-    .phone {
-      width: 400px;
-      height: 780px;
-      background: #111;
-      border-radius: 40px;
-      padding: 12px;
-      box-shadow: 0 0 0 8px #222, 0 0 0 12px #111, 0 25px 50px rgba(0,0,0,0.6);
-      position: relative;
-      overflow: hidden;
-    }
-
-    .phone-notch {
-      position: absolute;
-      top: 12px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 120px;
-      height: 28px;
-      background: #000;
-      border-radius: 20px;
-      z-index: 20;
-    }
-
-    .screen {
-      width: 100%;
-      height: 100%;
-      background: #0a0a0f;
-      border-radius: 32px;
-      overflow: hidden;
-      position: relative;
-    }
-
-    /* Setup Screen */
-    #setup-screen {
-      padding: 80px 20px 30px;
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-    }
-
-    .title {
-      text-align: center;
-      font-size: 22px;
-      font-weight: 700;
-      margin-bottom: 8px;
-      background: linear-gradient(90deg, #00d2ff, #3a7bd5);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .subtitle {
-      text-align: center;
-      font-size: 13px;
-      color: #aaa;
-      margin-bottom: 30px;
-    }
-
-    .link-input {
-      width: 100%;
-      background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 16px;
-      padding: 16px;
-      color: #fff;
-      font-size: 14px;
-      outline: none;
-      margin-bottom: 20px;
-    }
-
-    .link-input:focus {
-      border-color: #3a7bd5;
-      background: rgba(58,123,213,0.15);
-    }
-
-    .start-btn {
-      background: linear-gradient(90deg, #00d2ff, #3a7bd5);
-      border: none;
-      padding: 16px;
-      border-radius: 16px;
-      color: white;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    /* Video Screen */
-    #video-screen {
-      display: none;
-      height: 100%;
-      padding: 42px 8px 8px;
-      flex-direction: column;
-    }
-
-    .video-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      grid-template-rows: repeat(4, 1fr);
-      gap: 6px;
-      height: 100%;
-    }
-
-    .video-box {
-      position: relative;
-      background: #000;
-      border-radius: 8px;
-      overflow: hidden;
-      border: 1px solid rgba(255,255,255,0.1);
-      /* 16:9 অনুপাত ধরে রাখার চেষ্টা */
-      aspect-ratio: 16 / 9;
-    }
-
-    .video-box iframe {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      border: none;
-    }
-
-    .sound-btn {
-      position: absolute;
-      bottom: 5px;
-      right: 5px;
-      width: 26px;
-      height: 26px;
-      border-radius: 50%;
-      background: rgba(0,0,0,0.75);
-      border: 1px solid rgba(255,255,255,0.25);
-      color: #fff;
-      font-size: 13px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      z-index: 5;
-    }
-
-    .sound-btn.unmuted {
-      background: #3a7bd5;
-    }
-
-    .back-btn {
-      position: absolute;
-      top: 10px;
-      left: 12px;
-      background: rgba(255,255,255,0.12);
-      border: none;
-      color: #fff;
-      padding: 5px 12px;
-      border-radius: 20px;
-      font-size: 12px;
-      cursor: pointer;
-      z-index: 30;
-    }
-  </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>StreamX Live TV</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- HLS.js library for streaming m3u8 videos -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 </head>
 <body>
 
-  <div class="phone">
-    <div class="phone-notch"></div>
-
-    <div class="screen">
-      <!-- Setup -->
-      <div id="setup-screen">
-        <div class="title">12 Screen Player</div>
-        <div class="subtitle">একটা YouTube লিংক দিন</div>
-
-        <input type="text" class="link-input" id="videoLink" placeholder="এখানে YouTube লিংক পেস্ট করুন..." />
-
-        <button class="start-btn" onclick="startVideos()">Start 12 Screens</button>
+  <!-- ================= AUTH SCREEN (LOGIN / REGISTER) ================= -->
+  <div id="authScreen" class="overlay-screen">
+    <div class="auth-box">
+      <div class="logo">StreamX</div>
+      
+      <!-- Auth Tabs -->
+      <div class="auth-tabs">
+        <button id="tabLoginBtn" class="tab-btn active" onclick="switchAuthTab('login')">লগইন</button>
+        <button id="tabRegisterBtn" class="tab-btn" onclick="switchAuthTab('register')">রেজিস্টার</button>
       </div>
 
-      <!-- Videos -->
-      <div id="video-screen">
-        <button class="back-btn" onclick="goBack()">← Back</button>
-        <div class="video-grid" id="video-grid"></div>
+      <!-- Login Form -->
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <input type="tel" id="loginPhone" placeholder="ফোন নম্বর (যেমন: 01700000000)" required>
+        <input type="password" id="loginPassword" placeholder="পাসওয়ার্ড" required>
+        <button type="submit" id="loginSubmitBtn">লগইন করুন</button>
+      </form>
+
+      <!-- Register Form -->
+      <form id="registerForm" onsubmit="handleRegister(event)" style="display: none;">
+        <input type="text" id="regName" placeholder="আপনার সম্পূর্ণ নাম" required>
+        <input type="tel" id="regPhone" placeholder="ফোন নম্বর (যেমন: 01700000000)" required>
+        <input type="password" id="regPassword" placeholder="পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)" required>
+        <button type="submit" id="regSubmitBtn">একাউন্ট তৈরি করুন</button>
+      </form>
+
+      <p id="authMessage" class="msg-box"></p>
+    </div>
+  </div>
+
+  <!-- ================= SUBSCRIPTION SCREEN ================= -->
+  <div id="subScreen" class="overlay-screen" style="display: none;">
+    <div class="sub-box">
+      <h2>সাবস্ক্রিপশন প্রয়োজন</h2>
+      <p>লাইভ টিভি দেখতে যেকোনো একটি প্যাকেজ বেছে নিয়ে পেমেন্ট করুন।</p>
+      
+      <div id="packageList" class="package-list">
+        <!-- Dynamic Packages from Firestore -->
+      </div>
+
+      <div id="paymentFormBox" class="payment-box" style="display: none;">
+        <h3>পেমেন্ট সম্পন্ন করুন</h3>
+        <p id="selectedPkgText" class="pkg-highlight"></p>
+        
+        <!-- Bangla QR Payment Banner -->
+        <div class="qr-container">
+          <p class="qr-title">বিকাশ অ্যাপ দিয়ে নিচের QR কোডটি স্ক্যান করে অথবা নম্বর দেখে পেমেন্ট করুন:</p>
+          <img src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEg06gZyTA-e5Oadc95UJ3gmgFy6nzIpVkWYNdhAvmaJ437hfCvFkMX4FMJp3rwFBYBt9Bj7x7cvbO1Hv5vbDh9GcoWVXltwxUlW9QL7cchFzImw4m35fnc2FP0Pr9lqk-zb_uhpwP3bNBokVTs6-cK02FhI6Rm5xVqayNY5b1CfLk5wM3yXy8IArzDVO0oV/s780/1000094124.png" alt="bKash Payment QR" class="qr-image">
+        </div>
+
+        <input type="text" id="trxIdInput" placeholder="Transaction ID (TrxID) লিখুন" required>
+        <button onclick="submitPaymentRequest()">পেমেন্ট সাবমিট করুন</button>
+        <button class="btn-cancel" onclick="cancelPaymentSelect()">বাতিল</button>
+      </div>
+
+      <p id="subMessage" class="msg-box"></p>
+      <button class="btn-logout" onclick="handleLogout()">লগআউট করুন</button>
+    </div>
+  </div>
+
+  <!-- ================= MAIN APP SCREEN ================= -->
+  <div id="mainApp" style="display: none;">
+    <header>
+      <div class="logo">StreamX</div>
+      <div class="user-info">
+        <span id="userBadge" class="badge">Active</span>
+        <button onclick="handleLogout()" class="btn-sm">Logout</button>
+      </div>
+    </header>
+
+    <div class="categories">
+      <button class="cat-btn active" onclick="selectCategory('sports', this)">Sports</button>
+      <button class="cat-btn" onclick="selectCategory('news', this)">News</button>
+      <button class="cat-btn" onclick="selectCategory('bangla', this)">Bangla</button>
+      <button class="cat-btn" onclick="selectCategory('drama', this)">Drama</button>
+    </div>
+
+    <div class="main">
+      <div class="player-box">
+        <video id="player" controls playsinline></video>
+      </div>
+      <div class="status" id="status">ক্যাটাগরি সিলেক্ট করে চ্যানেল বাছাই করুন</div>
+      <div class="channel-list" id="channelList">
+        <!-- Dynamic Channels from Firestore -->
       </div>
     </div>
   </div>
 
-  <script>
-    function getYouTubeID(url) {
-      const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-      const match = url.match(regExp);
-      return (match && match[2].length === 11) ? match[2] : null;
-    }
-
-    function startVideos() {
-      const link = document.getElementById('videoLink').value.trim();
-      const videoId = getYouTubeID(link);
-
-      if (!videoId) {
-        alert('সঠিক YouTube লিংক দিন!');
-        return;
-      }
-
-      const videoGrid = document.getElementById('video-grid');
-      videoGrid.innerHTML = '';
-
-      for (let i = 0; i < 12; i++) {
-        const box = document.createElement('div');
-        box.className = 'video-box';
-
-        // অফিসিয়াল YouTube Embed ফরম্যাট
-        const iframe = document.createElement('iframe');
-        iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&controls=0&modestbranding=1&rel=0&playsinline=1&enablejsapi=1`;
-        iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
-        iframe.allowFullscreen = true;
-        iframe.loading = "lazy";
-        box.appendChild(iframe);
-
-        // সাউন্ড বাটন
-        const btn = document.createElement('div');
-        btn.className = 'sound-btn';
-        btn.innerHTML = '🔇';
-        btn.onclick = function () {
-          toggleSound(this, iframe, videoId);
-        };
-        box.appendChild(btn);
-
-        videoGrid.appendChild(box);
-      }
-
-      document.getElementById('setup-screen').style.display = 'none';
-      document.getElementById('video-screen').style.display = 'flex';
-    }
-
-    function toggleSound(btn, iframe, videoId) {
-      if (btn.classList.contains('unmuted')) {
-        // Mute
-        iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&controls=0&modestbranding=1&rel=0&playsinline=1`;
-        btn.innerHTML = '🔇';
-        btn.classList.remove('unmuted');
-      } else {
-        // Unmute
-        iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&controls=0&modestbranding=1&rel=0&playsinline=1`;
-        btn.innerHTML = '🔊';
-        btn.classList.add('unmuted');
-      }
-    }
-
-    function goBack() {
-      document.getElementById('video-screen').style.display = 'none';
-      document.getElementById('setup-screen').style.display = 'flex';
-    }
-  </script>
+  <script type="module" src="script.js"></script>
 </body>
 </html>
