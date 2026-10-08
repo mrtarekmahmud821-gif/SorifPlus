@@ -39,16 +39,39 @@ let currentUser = null;
 let selectedPackage = null;
 let currentHls = null;
 let currentCategory = 'sports';
+let currentChannel = null;
+let currentChannelElement = null;
+
 let userListener = null;
 let expiryCheckInterval = null;
 
-// Helper to format Phone into synthetic email
+// Auto-Refresh & Error Recovery Variables
+let stallTimeoutTimer = null;
+let lastPlayedTime = 0;
+let stallCheckInterval = null;
+
+// Format phone into synthetic email
 function phoneToEmail(phone) {
-  const cleanPhone = phone.replace(/[^0-9]/g, '');
-  return `${cleanPhone}@streamx.com`;
+  const clean = phone.replace(/[^0-9]/g, '');
+  return `${clean}@streamx.com`;
 }
 
-// Stop video player immediately
+// Show/Hide Player Loader Overlay
+function showPlayerLoader(text = "স্ট্রিম লোড হচ্ছে...") {
+  const loader = document.getElementById('playerLoader');
+  const loaderText = document.getElementById('loaderText');
+  if (loader && loaderText) {
+    loaderText.innerText = text;
+    loader.style.display = 'flex';
+  }
+}
+
+function hidePlayerLoader() {
+  const loader = document.getElementById('playerLoader');
+  if (loader) loader.style.display = 'none';
+}
+
+// Complete Player Teardown
 function stopVideoPlayer() {
   const video = document.getElementById('player');
   if (video) {
@@ -60,9 +83,12 @@ function stopVideoPlayer() {
     currentHls.destroy();
     currentHls = null;
   }
+  if (stallCheckInterval) clearInterval(stallCheckInterval);
+  if (stallTimeoutTimer) clearTimeout(stallTimeoutTimer);
+  hidePlayerLoader();
 }
 
-// ==================== AUTH TABS ====================
+// ==================== AUTHENTICATION TABS ====================
 window.switchAuthTab = function(tab) {
   const loginForm = document.getElementById("loginForm");
   const regForm = document.getElementById("registerForm");
@@ -83,7 +109,6 @@ window.switchAuthTab = function(tab) {
   }
 };
 
-// ==================== AUTHENTICATION LOGIC ====================
 window.handleRegister = async function(e) {
   e.preventDefault();
   const name = document.getElementById("regName").value.trim();
@@ -99,26 +124,21 @@ window.handleRegister = async function(e) {
 
   btn.disabled = true;
   msgEl.innerText = "একাউন্ট তৈরি হচ্ছে...";
-
   const email = phoneToEmail(phone);
 
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
 
-    // Save user record in Firestore
     await setDoc(doc(db, "users", user.uid), {
       name: name,
       phone: phone,
       email: email,
-      subscription: {
-        status: "expired",
-        expiry: 0
-      },
+      subscription: { status: "expired", expiry: 0 },
       createdAt: serverTimestamp()
     });
 
-    msgEl.style.color = "#28a745";
+    msgEl.style.color = "#38ef7d";
     msgEl.innerText = "একাউন্ট তৈরি সফল হয়েছে!";
   } catch (error) {
     btn.disabled = false;
@@ -140,12 +160,11 @@ window.handleLogin = async function(e) {
 
   btn.disabled = true;
   msgEl.innerText = "লগইন হচ্ছে...";
-
   const email = phoneToEmail(phone);
 
   try {
     await signInWithEmailAndPassword(auth, email, password);
-    msgEl.style.color = "#28a745";
+    msgEl.style.color = "#38ef7d";
     msgEl.innerText = "লগইন সফল!";
   } catch (error) {
     btn.disabled = false;
@@ -161,7 +180,7 @@ window.handleLogout = function() {
   signOut(auth);
 };
 
-// ==================== REALTIME SECURITY & SUBSCRIPTION WATCHER ====================
+// ==================== REALTIME SUBSCRIPTION WATCHER ====================
 onAuthStateChanged(auth, (user) => {
   const authScreen = document.getElementById("authScreen");
   const subScreen = document.getElementById("subScreen");
@@ -174,7 +193,6 @@ onAuthStateChanged(auth, (user) => {
     currentUser = user;
     authScreen.style.display = "none";
 
-    // Listen to realtime changes on user's subscription in Firestore
     userListener = onSnapshot(doc(db, "users", user.uid), (userDoc) => {
       if (!userDoc.exists()) return;
       
@@ -182,22 +200,17 @@ onAuthStateChanged(auth, (user) => {
       const sub = userData?.subscription || {};
       const now = Date.now();
 
-      // Check active status and timestamp expiration
       if (sub.status === "active" && sub.expiry && sub.expiry > now) {
         subScreen.style.display = "none";
         mainApp.style.display = "flex";
 
-        // Load channels dynamically
         loadChannels(currentCategory);
 
-        // Continuous interval check for live expiration
         if (expiryCheckInterval) clearInterval(expiryCheckInterval);
         expiryCheckInterval = setInterval(() => {
           if (Date.now() >= sub.expiry) {
             clearInterval(expiryCheckInterval);
-            updateDoc(doc(db, "users", user.uid), {
-              "subscription.status": "expired"
-            });
+            updateDoc(doc(db, "users", user.uid), { "subscription.status": "expired" });
             revokeAccess("আপনার সাবস্ক্রিপশনের মেয়াদ শেষ হয়ে গেছে!");
           }
         }, 3000);
@@ -205,8 +218,6 @@ onAuthStateChanged(auth, (user) => {
       } else {
         revokeAccess("আপনার কোনো সক্রিয় সাবস্ক্রিপশন নেই!");
       }
-    }, (err) => {
-      console.error("Firestore error:", err);
     });
 
   } else {
@@ -218,7 +229,6 @@ onAuthStateChanged(auth, (user) => {
   }
 });
 
-// Revoke App Access immediately
 function revokeAccess(reasonMessage) {
   stopVideoPlayer();
   document.getElementById("mainApp").style.display = "none";
@@ -229,7 +239,7 @@ function revokeAccess(reasonMessage) {
   loadPackages();
 }
 
-// ==================== SUBSCRIPTION LOGIC ====================
+// ==================== SUBSCRIPTION & PACKAGES ====================
 function loadPackages() {
   const pkgList = document.getElementById("packageList");
   pkgList.innerHTML = "প্যাকেজ লোড হচ্ছে...";
@@ -246,7 +256,7 @@ function loadPackages() {
       const id = docSnap.id;
       if (pkg.active !== false) {
         pkgList.innerHTML += `
-          <div class="package-card" onclick="selectPackage('${id}', '${pkg.name}', ${pkg.price}, ${pkg.durationDays})">
+          <div class="package-card" tabindex="0" onclick="selectPackage('${id}', '${pkg.name}', ${pkg.price}, ${pkg.durationDays})">
             <div class="package-info">
               <h4>${pkg.name}</h4>
               <p>মেয়াদ: ${pkg.durationDays} দিন</p>
@@ -291,7 +301,7 @@ window.submitPaymentRequest = async function() {
       timestamp: Date.now()
     });
 
-    alert("পেমেন্ট রিকোয়েস্ট সফলভাবে জমা হয়েছে! অ্যাডমিন যাচাই করার পর আপনার সাবস্ক্রিপশন চালু হবে।");
+    alert("পেমেন্ট রিকোয়েস্ট জমা দেওয়া হয়েছে! অ্যাডমিন অ্যাপ্রুভ করলে স্ট্রিম চালু হবে।");
     document.getElementById("trxIdInput").value = "";
     cancelPaymentSelect();
   } catch (error) {
@@ -299,7 +309,7 @@ window.submitPaymentRequest = async function() {
   }
 };
 
-// ==================== CHANNELS & PLAYER LOGIC ====================
+// ==================== CHANNELS & PLAYBACK ENGINE ====================
 window.selectCategory = function(cat, element) {
   currentCategory = cat;
   document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
@@ -312,10 +322,7 @@ function loadChannels(category) {
   const status = document.getElementById('status');
   list.innerHTML = 'চ্যানেল লোড হচ্ছে...';
 
-  const q = query(
-    collection(db, "channels"), 
-    where("category", "==", category)
-  );
+  const q = query(collection(db, "channels"), where("category", "==", category));
 
   onSnapshot(q, (snapshot) => {
     list.innerHTML = '';
@@ -333,51 +340,127 @@ function loadChannels(category) {
         count++;
         const div = document.createElement('div');
         div.className = 'channel';
+        div.tabIndex = 0; // Android TV Remote Focus
         div.innerHTML = `
           ${ch.logo ? `<img src="${ch.logo}" alt="${ch.name}" onerror="this.style.display='none'">` : ''}
           <div class="channel-name">${ch.name}</div>
         `;
         div.onclick = () => playChannel(ch, div);
+        div.addEventListener('keypress', (e) => { if (e.key === 'Enter') playChannel(ch, div); });
         list.appendChild(div);
       }
     });
 
-    status.innerText = `${category.toUpperCase()} ক্যাটাগরি • ${count} টি চ্যানেল`;
+    status.innerText = `${category.toUpperCase()} • ${count} টি চ্যানেল`;
   });
 }
 
+// Core Playback Function with Smart TV & Auto-Recovery Logic
 function playChannel(ch, element) {
-  if (!ch.url) {
+  if (!ch || !ch.url) {
     alert('চ্যানেলের স্ট্রিম URL পাওয়া যায়নি');
     return;
   }
 
+  currentChannel = ch;
+  currentChannelElement = element;
+
   document.querySelectorAll('.channel').forEach(c => c.classList.remove('active'));
-  element.classList.add('active');
+  if (element) element.classList.add('active');
 
   const video = document.getElementById('player');
   const status = document.getElementById('status');
 
   status.innerText = 'প্লে হচ্ছে: ' + ch.name;
+  showPlayerLoader('স্ট্রিম কানেক্ট করা হচ্ছে...');
+
+  if (stallCheckInterval) clearInterval(stallCheckInterval);
 
   if (Hls.isSupported()) {
     if (currentHls) {
       currentHls.destroy();
     }
-    currentHls = new Hls();
+
+    currentHls = new Hls({
+      enableWorker: true,
+      lowLatencyMode: true,
+      backBufferLength: 30,
+      manifestLoadingTimeOut: 10000,
+      manifestLoadingMaxRetry: 4,
+      levelLoadingTimeOut: 10000
+    });
+
     currentHls.loadSource(ch.url);
     currentHls.attachMedia(video);
+
     currentHls.on(Hls.Events.MANIFEST_PARSED, function () {
+      hidePlayerLoader();
       video.play().catch(() => {});
     });
-    currentHls.on(Hls.Events.ERROR, function () {
-      status.innerText = 'প্লে করতে সমস্যা হচ্ছে: ' + ch.name;
+
+    // Smart Recovery on HLS Network or Media Errors
+    currentHls.on(Hls.Events.ERROR, function (event, data) {
+      if (data.fatal) {
+        switch (data.type) {
+          case Hls.ErrorTypes.NETWORK_ERROR:
+            status.innerText = 'নেটওয়ার্ক সমস্যা! পুনঃরায় কানেক্ট করা হচ্ছে...';
+            showPlayerLoader('পুনরায় কানেক্ট হচ্ছে...');
+            currentHls.startLoad();
+            break;
+          case Hls.ErrorTypes.MEDIA_ERROR:
+            status.innerText = 'স্ট্রিম রিকভার করা হচ্ছে...';
+            currentHls.recoverMediaError();
+            break;
+          default:
+            status.innerText = 'স্ট্রিম সমস্যা! রিফ্রেশ হচ্ছে...';
+            setTimeout(() => playChannel(currentChannel, currentChannelElement), 2500);
+            break;
+        }
+      }
     });
+
   } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-    // Native HLS support for Safari / iOS
+    // Safari / Smart TV Native HLS Fallback
     video.src = ch.url;
     video.play().catch(() => {});
+    hidePlayerLoader();
   } else {
-    alert("আপনার ব্রাউজারে HLS প্লেয়ার সাপোর্ট করে না।");
+    hidePlayerLoader();
+    alert("আপনার ব্রাউজারে HLS সাপোর্ট নেই।");
+    return;
   }
+
+  // Setup Continuous Monitoring to Detect Freeze/Stall
+  lastPlayedTime = video.currentTime;
+  stallCheckInterval = setInterval(() => {
+    if (!video.paused && !video.ended) {
+      if (video.currentTime === lastPlayedTime) {
+        showPlayerLoader('ইন্টারনেট ধীরগতির কারণে বাফার হচ্ছে...');
+        // Auto reload after 8 seconds of continuous freeze
+        if (!stallTimeoutTimer) {
+          stallTimeoutTimer = setTimeout(() => {
+            status.innerText = 'অটোমেটিক রিফ্রেশ হচ্ছে...';
+            forceReloadCurrentStream();
+          }, 8000);
+        }
+      } else {
+        hidePlayerLoader();
+        if (stallTimeoutTimer) {
+          clearTimeout(stallTimeoutTimer);
+          stallTimeoutTimer = null;
+        }
       }
+      lastPlayedTime = video.currentTime;
+    }
+  }, 2000);
+}
+
+// Manual or Auto Forced Reload
+window.forceReloadCurrentStream = function() {
+  if (currentChannel) {
+    showPlayerLoader('স্ট্রিম রিফ্রেশ করা হচ্ছে...');
+    playChannel(currentChannel, currentChannelElement);
+  } else {
+    alert("আগে যেকোনো একটি চ্যানেল চালু করুন।");
+  }
+};
