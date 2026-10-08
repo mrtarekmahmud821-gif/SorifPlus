@@ -19,7 +19,7 @@ import {
   serverTimestamp 
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
-// Firebase Configuration
+// Firebase Config
 const firebaseConfig = {
   apiKey: "AIzaSyDzaSJuMumdlp_ZzjKvatvGm_7XLxq3jFM",
   authDomain: "link-click-work.firebaseapp.com",
@@ -45,7 +45,6 @@ let currentChannelElement = null;
 let userListener = null;
 let expiryCheckInterval = null;
 
-// Auto-Refresh & Error Recovery Variables
 let stallTimeoutTimer = null;
 let lastPlayedTime = 0;
 let stallCheckInterval = null;
@@ -56,14 +55,9 @@ function phoneToEmail(phone) {
   return `${clean}@streamx.com`;
 }
 
-// Show/Hide Player Loader Overlay
-function showPlayerLoader(text = "স্ট্রিম লোড হচ্ছে...") {
+function showPlayerLoader() {
   const loader = document.getElementById('playerLoader');
-  const loaderText = document.getElementById('loaderText');
-  if (loader && loaderText) {
-    loaderText.innerText = text;
-    loader.style.display = 'flex';
-  }
+  if (loader) loader.style.display = 'flex';
 }
 
 function hidePlayerLoader() {
@@ -71,7 +65,6 @@ function hidePlayerLoader() {
   if (loader) loader.style.display = 'none';
 }
 
-// Complete Player Teardown
 function stopVideoPlayer() {
   const video = document.getElementById('player');
   if (video) {
@@ -88,7 +81,90 @@ function stopVideoPlayer() {
   hidePlayerLoader();
 }
 
-// ==================== AUTHENTICATION TABS ====================
+// ==================== ANDROID TV D-PAD SPATIAL NAVIGATION ENGINE ====================
+function getVisibleFocusables() {
+  const activeContainer = document.getElementById("mainApp").style.display !== "none" 
+    ? document.getElementById("mainApp") 
+    : document.querySelector(".overlay-screen:not([style*='display: none'])");
+
+  if (!activeContainer) return [];
+  
+  return Array.from(activeContainer.querySelectorAll('.focusable, [tabindex="0"]'))
+    .filter(el => el.offsetWidth > 0 && el.offsetHeight > 0 && window.getComputedStyle(el).visibility !== 'hidden');
+}
+
+function navigateDPad(direction) {
+  document.body.classList.add("tv-dpad-mode");
+
+  const focusables = getVisibleFocusables();
+  if (focusables.length === 0) return;
+
+  let current = document.activeElement;
+  if (!focusables.includes(current)) {
+    focusables[0].focus();
+    return;
+  }
+
+  const currentRect = current.getBoundingClientRect();
+  const currentCenter = {
+    x: currentRect.left + currentRect.width / 2,
+    y: currentRect.top + currentRect.height / 2
+  };
+
+  let bestCandidate = null;
+  let minDistance = Infinity;
+
+  focusables.forEach(el => {
+    if (el === current) return;
+    const rect = el.getBoundingClientRect();
+    const center = {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2
+    };
+
+    let isValidDirection = false;
+    if (direction === 'ArrowUp' && center.y < currentCenter.y - 5) isValidDirection = true;
+    if (direction === 'ArrowDown' && center.y > currentCenter.y + 5) isValidDirection = true;
+    if (direction === 'ArrowLeft' && center.x < currentCenter.x - 5) isValidDirection = true;
+    if (direction === 'ArrowRight' && center.x > currentCenter.x + 5) isValidDirection = true;
+
+    if (isValidDirection) {
+      const dist = Math.hypot(center.x - currentCenter.x, center.y - currentCenter.y);
+      if (dist < minDistance) {
+        minDistance = dist;
+        bestCandidate = el;
+      }
+    }
+  });
+
+  if (bestCandidate) {
+    bestCandidate.focus();
+    bestCandidate.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+// Keydown Listener for Android TV Remote D-pad
+document.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+    e.preventDefault();
+    navigateDPad(e.key);
+  } else if (e.key === 'Enter') {
+    if (document.activeElement && typeof document.activeElement.click === 'function') {
+      document.activeElement.click();
+    }
+  } else if (e.key === 'Escape' || e.key === 'Backspace' || e.key === 'GoBack') {
+    // Return focus to Category Bar if pressing Back from Channels/Player
+    const firstCat = document.querySelector('.cat-btn');
+    if (firstCat) firstCat.focus();
+  }
+});
+
+// Show Mouse Cursor if mouse is moved
+document.addEventListener('mousemove', () => {
+  document.body.classList.remove("tv-dpad-mode");
+});
+
+// ==================== AUTHENTICATION LOGIC ====================
 window.switchAuthTab = function(tab) {
   const loginForm = document.getElementById("loginForm");
   const regForm = document.getElementById("registerForm");
@@ -118,12 +194,12 @@ window.handleRegister = async function(e) {
   const btn = document.getElementById("regSubmitBtn");
 
   if (password.length < 6) {
-    msgEl.innerText = "পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।";
+    msgEl.innerText = "Password must be at least 6 characters.";
     return;
   }
 
   btn.disabled = true;
-  msgEl.innerText = "একাউন্ট তৈরি হচ্ছে...";
+  msgEl.innerText = "Creating account...";
   const email = phoneToEmail(phone);
 
   try {
@@ -139,12 +215,12 @@ window.handleRegister = async function(e) {
     });
 
     msgEl.style.color = "#38ef7d";
-    msgEl.innerText = "একাউন্ট তৈরি সফল হয়েছে!";
+    msgEl.innerText = "Account created successfully!";
   } catch (error) {
     btn.disabled = false;
     msgEl.style.color = "#ff4d4d";
     if (error.code === "auth/email-already-in-use") {
-      msgEl.innerText = "এই ফোন নম্বরে ইতিপূর্বে একাউন্ট তৈরি করা হয়েছে।";
+      msgEl.innerText = "An account already exists with this phone number.";
     } else {
       msgEl.innerText = error.message;
     }
@@ -159,17 +235,17 @@ window.handleLogin = async function(e) {
   const btn = document.getElementById("loginSubmitBtn");
 
   btn.disabled = true;
-  msgEl.innerText = "লগইন হচ্ছে...";
+  msgEl.innerText = "Logging in...";
   const email = phoneToEmail(phone);
 
   try {
     await signInWithEmailAndPassword(auth, email, password);
     msgEl.style.color = "#38ef7d";
-    msgEl.innerText = "লগইন সফল!";
+    msgEl.innerText = "Login successful!";
   } catch (error) {
     btn.disabled = false;
     msgEl.style.color = "#ff4d4d";
-    msgEl.innerText = "ফোন নম্বর অথবা পাসওয়ার্ড ভুল!";
+    msgEl.innerText = "Invalid phone number or password!";
   }
 };
 
@@ -206,17 +282,23 @@ onAuthStateChanged(auth, (user) => {
 
         loadChannels(currentCategory);
 
+        // Auto-focus first category for TV remote on login
+        setTimeout(() => {
+          const activeCat = document.querySelector('.cat-btn.active');
+          if (activeCat) activeCat.focus();
+        }, 500);
+
         if (expiryCheckInterval) clearInterval(expiryCheckInterval);
         expiryCheckInterval = setInterval(() => {
           if (Date.now() >= sub.expiry) {
             clearInterval(expiryCheckInterval);
             updateDoc(doc(db, "users", user.uid), { "subscription.status": "expired" });
-            revokeAccess("আপনার সাবস্ক্রিপশনের মেয়াদ শেষ হয়ে গেছে!");
+            revokeAccess("Your subscription has expired!");
           }
         }, 3000);
 
       } else {
-        revokeAccess("আপনার কোনো সক্রিয় সাবস্ক্রিপশন নেই!");
+        revokeAccess("No active subscription found!");
       }
     });
 
@@ -242,12 +324,12 @@ function revokeAccess(reasonMessage) {
 // ==================== SUBSCRIPTION & PACKAGES ====================
 function loadPackages() {
   const pkgList = document.getElementById("packageList");
-  pkgList.innerHTML = "প্যাকেজ লোড হচ্ছে...";
+  pkgList.innerHTML = "Loading packages...";
 
   onSnapshot(collection(db, "packages"), (snapshot) => {
     pkgList.innerHTML = "";
     if (snapshot.empty) {
-      pkgList.innerHTML = "<p style='color:#888'>কোনো সক্রিয় প্যাকেজ পাওয়া যায়নি</p>";
+      pkgList.innerHTML = "<p style='color:#888'>No packages available</p>";
       return;
     }
 
@@ -256,10 +338,10 @@ function loadPackages() {
       const id = docSnap.id;
       if (pkg.active !== false) {
         pkgList.innerHTML += `
-          <div class="package-card" tabindex="0" onclick="selectPackage('${id}', '${pkg.name}', ${pkg.price}, ${pkg.durationDays})">
+          <div class="package-card focusable" tabindex="0" onclick="selectPackage('${id}', '${pkg.name}', ${pkg.price}, ${pkg.durationDays})">
             <div class="package-info">
               <h4>${pkg.name}</h4>
-              <p>মেয়াদ: ${pkg.durationDays} দিন</p>
+              <p>Duration: ${pkg.durationDays} Days</p>
             </div>
             <div class="package-price">৳${pkg.price}</div>
           </div>
@@ -271,7 +353,7 @@ function loadPackages() {
 
 window.selectPackage = function(id, name, price, days) {
   selectedPackage = { id, name, price, days };
-  document.getElementById("selectedPkgText").innerText = `নির্বাচিত প্যাকেজ: ${name} (৳${price} - ${days} দিন)`;
+  document.getElementById("selectedPkgText").innerText = `Package: ${name} (৳${price} - ${days} Days)`;
   document.getElementById("paymentFormBox").style.display = "block";
 };
 
@@ -285,7 +367,7 @@ window.submitPaymentRequest = async function() {
   const msgEl = document.getElementById("subMessage");
 
   if (!trxId) {
-    alert("Transaction ID (TrxID) প্রদান করুন।");
+    alert("Please enter a Transaction ID (TrxID)");
     return;
   }
 
@@ -301,11 +383,11 @@ window.submitPaymentRequest = async function() {
       timestamp: Date.now()
     });
 
-    alert("পেমেন্ট রিকোয়েস্ট জমা দেওয়া হয়েছে! অ্যাডমিন অ্যাপ্রুভ করলে স্ট্রিম চালু হবে।");
+    alert("Payment submitted! Your subscription will activate once approved.");
     document.getElementById("trxIdInput").value = "";
     cancelPaymentSelect();
   } catch (error) {
-    msgEl.innerText = "এরর: " + error.message;
+    msgEl.innerText = "Error: " + error.message;
   }
 };
 
@@ -320,7 +402,7 @@ window.selectCategory = function(cat, element) {
 function loadChannels(category) {
   const list = document.getElementById('channelList');
   const status = document.getElementById('status');
-  list.innerHTML = 'চ্যানেল লোড হচ্ছে...';
+  list.innerHTML = 'Loading channels...';
 
   const q = query(collection(db, "channels"), where("category", "==", category));
 
@@ -328,8 +410,8 @@ function loadChannels(category) {
     list.innerHTML = '';
     
     if (snapshot.empty) {
-      list.innerHTML = `<p style="color:#888; grid-column: 1/-1; text-align:center;">${category.toUpperCase()} ক্যাটাগরিতে কোনো চ্যানেল নেই</p>`;
-      status.innerText = `${category.toUpperCase()} • 0 টি চ্যানেল`;
+      list.innerHTML = `<p style="color:#888; grid-column: 1/-1; text-align:center;">No channels found in ${category.toUpperCase()}</p>`;
+      status.innerText = `${category.toUpperCase()} • 0 Channels`;
       return;
     }
 
@@ -339,26 +421,24 @@ function loadChannels(category) {
       if (ch.active !== false) {
         count++;
         const div = document.createElement('div');
-        div.className = 'channel';
-        div.tabIndex = 0; // Android TV Remote Focus
+        div.className = 'channel focusable';
+        div.tabIndex = 0;
         div.innerHTML = `
           ${ch.logo ? `<img src="${ch.logo}" alt="${ch.name}" onerror="this.style.display='none'">` : ''}
           <div class="channel-name">${ch.name}</div>
         `;
         div.onclick = () => playChannel(ch, div);
-        div.addEventListener('keypress', (e) => { if (e.key === 'Enter') playChannel(ch, div); });
         list.appendChild(div);
       }
     });
 
-    status.innerText = `${category.toUpperCase()} • ${count} টি চ্যানেল`;
+    status.innerText = `${category.toUpperCase()} • ${count} Channels`;
   });
 }
 
-// Core Playback Function with Smart TV & Auto-Recovery Logic
 function playChannel(ch, element) {
   if (!ch || !ch.url) {
-    alert('চ্যানেলের স্ট্রিম URL পাওয়া যায়নি');
+    alert('Stream URL not found');
     return;
   }
 
@@ -371,8 +451,8 @@ function playChannel(ch, element) {
   const video = document.getElementById('player');
   const status = document.getElementById('status');
 
-  status.innerText = 'প্লে হচ্ছে: ' + ch.name;
-  showPlayerLoader('স্ট্রিম কানেক্ট করা হচ্ছে...');
+  status.innerText = 'Playing: ' + ch.name;
+  showPlayerLoader();
 
   if (stallCheckInterval) clearInterval(stallCheckInterval);
 
@@ -386,8 +466,7 @@ function playChannel(ch, element) {
       lowLatencyMode: true,
       backBufferLength: 30,
       manifestLoadingTimeOut: 10000,
-      manifestLoadingMaxRetry: 4,
-      levelLoadingTimeOut: 10000
+      manifestLoadingMaxRetry: 4
     });
 
     currentHls.loadSource(ch.url);
@@ -398,50 +477,43 @@ function playChannel(ch, element) {
       video.play().catch(() => {});
     });
 
-    // Smart Recovery on HLS Network or Media Errors
     currentHls.on(Hls.Events.ERROR, function (event, data) {
       if (data.fatal) {
         switch (data.type) {
           case Hls.ErrorTypes.NETWORK_ERROR:
-            status.innerText = 'নেটওয়ার্ক সমস্যা! পুনঃরায় কানেক্ট করা হচ্ছে...';
-            showPlayerLoader('পুনরায় কানেক্ট হচ্ছে...');
+            showPlayerLoader();
             currentHls.startLoad();
             break;
           case Hls.ErrorTypes.MEDIA_ERROR:
-            status.innerText = 'স্ট্রিম রিকভার করা হচ্ছে...';
             currentHls.recoverMediaError();
             break;
           default:
-            status.innerText = 'স্ট্রিম সমস্যা! রিফ্রেশ হচ্ছে...';
-            setTimeout(() => playChannel(currentChannel, currentChannelElement), 2500);
+            setTimeout(() => playChannel(currentChannel, currentChannelElement), 2000);
             break;
         }
       }
     });
 
   } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-    // Safari / Smart TV Native HLS Fallback
     video.src = ch.url;
     video.play().catch(() => {});
     hidePlayerLoader();
   } else {
     hidePlayerLoader();
-    alert("আপনার ব্রাউজারে HLS সাপোর্ট নেই।");
+    alert("HLS playback is not supported on this browser.");
     return;
   }
 
-  // Setup Continuous Monitoring to Detect Freeze/Stall
+  // Auto Refresh Recovery Mechanism
   lastPlayedTime = video.currentTime;
   stallCheckInterval = setInterval(() => {
     if (!video.paused && !video.ended) {
       if (video.currentTime === lastPlayedTime) {
-        showPlayerLoader('ইন্টারনেট ধীরগতির কারণে বাফার হচ্ছে...');
-        // Auto reload after 8 seconds of continuous freeze
+        showPlayerLoader();
         if (!stallTimeoutTimer) {
           stallTimeoutTimer = setTimeout(() => {
-            status.innerText = 'অটোমেটিক রিফ্রেশ হচ্ছে...';
             forceReloadCurrentStream();
-          }, 8000);
+          }, 6000);
         }
       } else {
         hidePlayerLoader();
@@ -455,12 +527,9 @@ function playChannel(ch, element) {
   }, 2000);
 }
 
-// Manual or Auto Forced Reload
 window.forceReloadCurrentStream = function() {
   if (currentChannel) {
-    showPlayerLoader('স্ট্রিম রিফ্রেশ করা হচ্ছে...');
+    showPlayerLoader();
     playChannel(currentChannel, currentChannelElement);
-  } else {
-    alert("আগে যেকোনো একটি চ্যানেল চালু করুন।");
   }
 };
