@@ -3,37 +3,49 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>StreamX Live TV</title>
+  <title>StreamX OTT - Live TV</title>
   <link rel="stylesheet" href="style.css">
-  <!-- HLS.js library for streaming m3u8 videos -->
+  <!-- HLS.js library for high-performance m3u8 playback -->
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 </head>
 <body>
 
-  <!-- ================= AUTH SCREEN (LOGIN / REGISTER) ================= -->
+  <!-- ================= AUTH SCREEN ================= -->
   <div id="authScreen" class="overlay-screen">
-    <div class="auth-box">
-      <div class="logo">StreamX</div>
+    <div class="auth-card">
+      <div class="brand-header">
+        <h1 class="logo">Stream<span>X</span></h1>
+        <p class="tagline">স্মার্ট ও প্রিমিয়াম লাইভ টিভি এক্সপেরিয়েন্স</p>
+      </div>
       
-      <!-- Auth Tabs -->
       <div class="auth-tabs">
-        <button id="tabLoginBtn" class="tab-btn active" onclick="switchAuthTab('login')">লগইন</button>
-        <button id="tabRegisterBtn" class="tab-btn" onclick="switchAuthTab('register')">রেজিস্টার</button>
+        <button id="tabLoginBtn" class="tab-btn active" tabindex="0" onclick="switchAuthTab('login')">লগইন</button>
+        <button id="tabRegisterBtn" class="tab-btn" tabindex="0" onclick="switchAuthTab('register')">রেজিস্টার</button>
       </div>
 
       <!-- Login Form -->
       <form id="loginForm" onsubmit="handleLogin(event)">
-        <input type="tel" id="loginPhone" placeholder="ফোন নম্বর (যেমন: 01700000000)" required>
-        <input type="password" id="loginPassword" placeholder="পাসওয়ার্ড" required>
-        <button type="submit" id="loginSubmitBtn">লগইন করুন</button>
+        <div class="input-group">
+          <input type="tel" id="loginPhone" placeholder="ফোন নম্বর (যেমন: 01700000000)" required tabindex="0">
+        </div>
+        <div class="input-group">
+          <input type="password" id="loginPassword" placeholder="পাসওয়ার্ড" required tabindex="0">
+        </div>
+        <button type="submit" id="loginSubmitBtn" class="btn-primary" tabindex="0">লগইন করুন</button>
       </form>
 
       <!-- Register Form -->
       <form id="registerForm" onsubmit="handleRegister(event)" style="display: none;">
-        <input type="text" id="regName" placeholder="আপনার সম্পূর্ণ নাম" required>
-        <input type="tel" id="regPhone" placeholder="ফোন নম্বর (যেমন: 01700000000)" required>
-        <input type="password" id="regPassword" placeholder="পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)" required>
-        <button type="submit" id="regSubmitBtn">একাউন্ট তৈরি করুন</button>
+        <div class="input-group">
+          <input type="text" id="regName" placeholder="আপনার সম্পূর্ণ নাম" required tabindex="0">
+        </div>
+        <div class="input-group">
+          <input type="tel" id="regPhone" placeholder="ফোন নম্বর (যেমন: 01700000000)" required tabindex="0">
+        </div>
+        <div class="input-group">
+          <input type="password" id="regPassword" placeholder="পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)" required tabindex="0">
+        </div>
+        <button type="submit" id="regSubmitBtn" class="btn-primary" tabindex="0">একাউন্ট তৈরি করুন</button>
       </form>
 
       <p id="authMessage" class="msg-box"></p>
@@ -42,60 +54,85 @@
 
   <!-- ================= SUBSCRIPTION SCREEN ================= -->
   <div id="subScreen" class="overlay-screen" style="display: none;">
-    <div class="sub-box">
-      <h2>সাবস্ক্রিপশন প্রয়োজন</h2>
-      <p>লাইভ টিভি দেখতে যেকোনো একটি প্যাকেজ বেছে নিয়ে পেমেন্ট করুন।</p>
+    <div class="sub-card">
+      <div class="sub-header">
+        <h2>সাবস্ক্রিপশন প্রয়োজন</h2>
+        <p>টিভি স্ট্রিম উপভোগ করতে যেকোনো একটি প্যাকেজ অ্যাক্টিভ করুন</p>
+      </div>
       
       <div id="packageList" class="package-list">
-        <!-- Dynamic Packages from Firestore -->
+        <!-- Dynamic Packages -->
       </div>
 
       <div id="paymentFormBox" class="payment-box" style="display: none;">
-        <h3>পেমেন্ট সম্পন্ন করুন</h3>
-        <p id="selectedPkgText" class="pkg-highlight"></p>
+        <h3 id="selectedPkgText" class="pkg-title"></h3>
         
-        <!-- Bangla QR Payment Banner -->
-        <div class="qr-container">
-          <p class="qr-title">বিকাশ অ্যাপ দিয়ে নিচের QR কোডটি স্ক্যান করে অথবা নম্বর দেখে পেমেন্ট করুন:</p>
-          <img src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEg06gZyTA-e5Oadc95UJ3gmgFy6nzIpVkWYNdhAvmaJ437hfCvFkMX4FMJp3rwFBYBt9Bj7x7cvbO1Hv5vbDh9GcoWVXltwxUlW9QL7cchFzImw4m35fnc2FP0Pr9lqk-zb_uhpwP3bNBokVTs6-cK02FhI6Rm5xVqayNY5b1CfLk5wM3yXy8IArzDVO0oV/s780/1000094124.png" alt="bKash Payment QR" class="qr-image">
+        <div class="qr-box">
+          <p class="qr-desc">বিকাশ অ্যাপ দিয়ে নিচের QR কোডটি স্ক্যান করে অথবা নাম্বার দেখে সেন্ড মানি/পেমেন্ট করুন:</p>
+          <img src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEg06gZyTA-e5Oadc95UJ3gmgFy6nzIpVkWYNdhAvmaJ437hfCvFkMX4FMJp3rwFBYBt9Bj7x7cvbO1Hv5vbDh9GcoWVXltwxUlW9QL7cchFzImw4m35fnc2FP0Pr9lqk-zb_uhpwP3bNBokVTs6-cK02FhI6Rm5xVqayNY5b1CfLk5wM3yXy8IArzDVO0oV/s780/1000094124.png" alt="Payment QR" class="qr-img">
         </div>
 
-        <input type="text" id="trxIdInput" placeholder="Transaction ID (TrxID) লিখুন" required>
-        <button onclick="submitPaymentRequest()">পেমেন্ট সাবমিট করুন</button>
-        <button class="btn-cancel" onclick="cancelPaymentSelect()">বাতিল</button>
+        <div class="input-group">
+          <input type="text" id="trxIdInput" placeholder="Transaction ID (TrxID) লিখুন" required tabindex="0">
+        </div>
+        <button onclick="submitPaymentRequest()" class="btn-primary" tabindex="0">পেমেন্ট সাবমিট করুন</button>
+        <button onclick="cancelPaymentSelect()" class="btn-secondary" tabindex="0">বাতিল</button>
       </div>
 
       <p id="subMessage" class="msg-box"></p>
-      <button class="btn-logout" onclick="handleLogout()">লগআউট করুন</button>
+      <button class="btn-outline" onclick="handleLogout()" tabindex="0">লগআউট করুন</button>
     </div>
   </div>
 
   <!-- ================= MAIN APP SCREEN ================= -->
   <div id="mainApp" style="display: none;">
-    <header>
-      <div class="logo">StreamX</div>
-      <div class="user-info">
-        <span id="userBadge" class="badge">Active</span>
-        <button onclick="handleLogout()" class="btn-sm">Logout</button>
+    <header class="app-header">
+      <div class="header-left">
+        <div class="logo">Stream<span>X</span></div>
+        <span class="live-indicator"><span class="dot"></span> LIVE TV</span>
+      </div>
+      <div class="header-right">
+        <span id="userBadge" class="badge-active">ACTIVE</span>
+        <button onclick="handleLogout()" class="btn-sm" tabindex="0">Logout</button>
       </div>
     </header>
 
-    <div class="categories">
-      <button class="cat-btn active" onclick="selectCategory('sports', this)">Sports</button>
-      <button class="cat-btn" onclick="selectCategory('news', this)">News</button>
-      <button class="cat-btn" onclick="selectCategory('bangla', this)">Bangla</button>
-      <button class="cat-btn" onclick="selectCategory('drama', this)">Drama</button>
-    </div>
+    <nav class="categories-bar">
+      <button class="cat-btn active" tabindex="0" onclick="selectCategory('sports', this)">Sports</button>
+      <button class="cat-btn" tabindex="0" onclick="selectCategory('news', this)">News</button>
+      <button class="cat-btn" tabindex="0" onclick="selectCategory('bangla', this)">Bangla</button>
+      <button class="cat-btn" tabindex="0" onclick="selectCategory('drama', this)">Drama</button>
+    </nav>
 
-    <div class="main">
-      <div class="player-box">
-        <video id="player" controls playsinline></video>
-      </div>
-      <div class="status" id="status">ক্যাটাগরি সিলেক্ট করে চ্যানেল বাছাই করুন</div>
-      <div class="channel-list" id="channelList">
-        <!-- Dynamic Channels from Firestore -->
-      </div>
-    </div>
+    <main class="app-viewport">
+      <!-- Player Container -->
+      <section class="player-wrapper">
+        <div class="player-container">
+          <video id="player" controls playsinline tabindex="0"></video>
+          <div id="playerLoader" class="player-overlay-loader" style="display: none;">
+            <div class="spinner"></div>
+            <p id="loaderText">স্ট্রিম লোড হচ্ছে...</p>
+          </div>
+        </div>
+        <div class="stream-status-bar">
+          <div class="status-info">
+            <span class="status-icon">📺</span>
+            <span id="status">ক্যাটাগরি সিলেক্ট করে চ্যানেল বাছাই করুন</span>
+          </div>
+          <button id="manualRefreshBtn" class="btn-refresh" tabindex="0" onclick="forceReloadCurrentStream()">
+            🔄 রিফ্রেশ স্ট্রিম
+          </button>
+        </div>
+      </section>
+
+      <!-- Channel Grid Section -->
+      <section class="channels-wrapper">
+        <div class="section-title">উপলব্ধ চ্যানেলসমূহ</div>
+        <div class="channel-grid" id="channelList">
+          <!-- Dynamic Channel Cards -->
+        </div>
+      </section>
+    </main>
   </div>
 
   <script type="module" src="script.js"></script>
